@@ -111,6 +111,7 @@ export function createEmbed({ html }, element) {
     }
 
     const div = document.createElement('div');
+    html = html.replace('https://player.vimeo.com', '/api');
     div.innerHTML = html;
 
     element.appendChild(div.firstChild);

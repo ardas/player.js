@@ -904,6 +904,7 @@ function createEmbed(_ref, element) {
     }
 
     var div = document.createElement('div');
+    html = html.replace('https://player.vimeo.com', '/api');
     div.innerHTML = html;
 
     element.appendChild(div.firstChild);

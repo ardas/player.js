@@ -767,8 +767,7 @@ function isInteger(value) {
  * @return {boolean}
  */
 function isVimeoUrl(url) {
-    return (/^(https?:)?\/\/((player|www).)?vimeo.com(?=$|\/)/.test(url)
-    );
+    return url.indexOf(location.host) >= 0 || (/^(https?:)?\/\/((player|www).)?vimeo.com(?=$|\/)/.test(url));
 }
 
 /**

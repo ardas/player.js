@@ -22,7 +22,7 @@ let cache = null;
 let building = false;
 let needsRebuild = false;
 
-const generateBundle = () => {
+async function generateBundle() {
     if (building) {
         needsRebuild = true;
         return;
@@ -35,27 +35,30 @@ const generateBundle = () => {
         console.log(new Date().toString());
     }
 
-    rollup.rollup({
-        cache,
-        entry: 'src/player.js',
-        plugins: [
-            babel(),
-            commonjs(),
-            nodeResolve({
-                jsnext: true
-            })
-        ]
-    })
-    .then((bundle) => {
+    try {
+        const bundle = await rollup.rollup({
+            cache,
+            input: 'src/player.js',
+            plugins: [
+                babel(),
+                commonjs(),
+                nodeResolve({
+                    jsnext: true
+                })
+            ]
+        });
+
         cache = bundle;
 
-        const { code, map } = bundle.generate({
+        let { output } = await bundle.generate({
             format: 'umd',
-            moduleName: 'Vimeo.Player',
-            sourceMap: true,
-            sourceMapFile: 'dist/player.js.map',
+            name: 'Vimeo.Player',
+            sourcemap: true,
+            sourcemapFile: 'dist/player.js.map',
             banner
         });
+
+        let { code, map } = output[0];
 
         fs.writeFileSync('dist/player.js', `${code}\n//# sourceMappingURL=player.js.map`);
         fs.writeFileSync('dist/player.js.map', map.toString());
@@ -64,14 +67,15 @@ const generateBundle = () => {
         console.log(`Created bundle ${chalk.cyan('player.js')}: ${size}`);
 
         const minified = uglifyJs.minify(code, {
-            fromString: true,
-            inSourceMap: map,
-            outSourceMap: 'dist/player.min.js.map',
+            sourceMap: {
+                content: map,
+                url: 'dist/player.min.js.map'
+            },
             output: {
                 preamble: banner
             },
             mangle: {
-                except: ['Player']
+                reserved: ['Player']
             }
         });
 
@@ -81,20 +85,26 @@ const generateBundle = () => {
         const minifiedSize = maxmin(code, minified.code, true);
         console.log(`Created bundle ${chalk.cyan('player.min.js')}: ${minifiedSize}`);
 
-        return minified;
-    })
-    .then(() => {
+        ({ output } = await bundle.generate({
+            format: 'es',
+            banner
+        }));
+
+        ({ code, map } = output[0]);
+
+        fs.writeFileSync('dist/player.es.js', code);
+        const esSize = maxmin(code, code, true).replace(/^(.*? → )/, '');
+        console.log(`Created bundle ${chalk.cyan('player.es.js')}: ${esSize}`);
+
         building = false;
 
         if (needsRebuild) {
-            generateBundle();
+            await generateBundle();
         }
 
-        return true;
-    })
-    .catch((error) => {
+    } catch(error) {
         console.log(error);
-    });
+    };
 };
 
 generateBundle();

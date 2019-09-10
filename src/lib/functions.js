@@ -3,6 +3,15 @@
  */
 
 /**
+ * Check to see this is a node environment.
+ * @type {Boolean}
+ */
+/* global global */
+export const isNode =
+    typeof global !== "undefined" &&
+    {}.toString.call(global) === "[object global]";
+
+/**
  * Get the name of the method for a given getter or setter.
  *
  * @param {string} prop The name of the property.
@@ -14,7 +23,9 @@ export function getMethodName(prop, type) {
         return prop;
     }
 
-    return `${type.toLowerCase()}${prop.substr(0, 1).toUpperCase()}${prop.substr(1)}`;
+    return `${type.toLowerCase()}${prop
+        .substr(0, 1)
+        .toUpperCase()}${prop.substr(1)}`;
 }
 
 /**
@@ -24,7 +35,13 @@ export function getMethodName(prop, type) {
  * @return {boolean}
  */
 export function isDomElement(element) {
-    return element instanceof window.HTMLElement;
+    return Boolean(
+        element &&
+            element.nodeType === 1 &&
+            "nodeName" in element &&
+            element.ownerDocument &&
+            element.ownerDocument.defaultView
+    );
 }
 
 /**
@@ -37,7 +54,11 @@ export function isDomElement(element) {
  */
 export function isInteger(value) {
     // eslint-disable-next-line eqeqeq
-    return !isNaN(parseFloat(value)) && isFinite(value) && Math.floor(value) == value;
+    return (
+        !isNaN(parseFloat(value)) &&
+        isFinite(value) &&
+        Math.floor(value) == value
+    );
 }
 
 /**
@@ -47,7 +68,10 @@ export function isInteger(value) {
  * @return {boolean}
  */
 export function isVimeoUrl(url) {
-    return url.indexOf(location.host) >= 0 || (/^(https?:)?\/\/((player|www).)?vimeo.com(?=$|\/)/.test(url));
+    return (
+        url.indexOf(location.host) >= 0 ||
+        /^(https?:)?\/\/((player|www)\.)?vimeo\.com(?=$|\/)/.test(url)
+    );
 }
 
 /**
@@ -63,7 +87,9 @@ export function getVimeoUrl(oEmbedParameters = {}) {
     const idOrUrl = id || url;
 
     if (!idOrUrl) {
-        throw new Error('An id or url must be passed, either in an options object or as a data-vimeo-id or data-vimeo-url attribute.');
+        throw new Error(
+            "An id or url must be passed, either in an options object or as a data-vimeo-id or data-vimeo-url attribute."
+        );
     }
 
     if (isInteger(idOrUrl)) {
@@ -71,7 +97,7 @@ export function getVimeoUrl(oEmbedParameters = {}) {
     }
 
     if (isVimeoUrl(idOrUrl)) {
-        return idOrUrl.replace('http:', 'https:');
+        return idOrUrl.replace("http:", "https:");
     }
 
     if (id) {

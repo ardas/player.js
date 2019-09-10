@@ -1,10 +1,10 @@
 import './lib/compatibility-check';
 
-import 'es6-collections';
+import 'weakmap-polyfill';
 import Promise from 'native-promise-only';
 
 import { storeCallback, getCallbacks, removeCallback, swapCallbacks } from './lib/callbacks';
-import { getMethodName, isDomElement, isVimeoUrl, getVimeoUrl } from './lib/functions';
+import { getMethodName, isDomElement, isVimeoUrl, getVimeoUrl, isNode } from './lib/functions';
 import { getOEmbedParameters, getOEmbedData, createEmbed, initializeEmbeds, resizeEmbeds } from './lib/embed';
 import { parseMessageData, postMessage, processData } from './lib/postmessage';
 
@@ -12,7 +12,7 @@ const playerMap = new WeakMap();
 const readyMap = new WeakMap();
 
 class Player {
-     /**
+    /**
      * Create a Player.
      *
      * @param {(HTMLIFrameElement|HTMLElement|string|jQuery)} element A reference to the Vimeo
@@ -31,7 +31,7 @@ class Player {
         }
 
         // Find an element by ID
-        if (typeof element === 'string') {
+        if (typeof document !== 'undefined' && typeof element === 'string') {
             element = document.getElementById(element);
         }
 
@@ -39,6 +39,8 @@ class Player {
         if (!isDomElement(element)) {
             throw new TypeError('You must pass either a valid element or a valid id.');
         }
+
+        const win = element.ownerDocument.defaultView;
 
         // Already initialized an embed in this div, so grab the iframe
         if (element.nodeName !== 'IFRAME') {
@@ -73,8 +75,18 @@ class Player {
                 }
 
                 const data = parseMessageData(event.data);
-                const isReadyEvent = 'event' in data && data.event === 'ready';
-                const isPingResponse = 'method' in data && data.method === 'ping';
+                const isError = data && data.event === 'error';
+                const isReadyError = isError && data.data && data.data.method === 'ready';
+
+                if (isReadyError) {
+                    const error = new Error(data.data.message);
+                    error.name = data.data.name;
+                    reject(error);
+                    return;
+                }
+
+                const isReadyEvent = data && data.event === 'ready';
+                const isPingResponse = data && data.method === 'ping';
 
                 if (isReadyEvent || isPingResponse) {
                     this.element.setAttribute('data-ready', 'true');
@@ -85,26 +97,29 @@ class Player {
                 processData(this, data);
             };
 
-            if (window.addEventListener) {
-                window.addEventListener('message', onMessage, false);
+            if (win.addEventListener) {
+                win.addEventListener('message', onMessage, false);
             }
-            else if (window.attachEvent) {
-                window.attachEvent('onmessage', onMessage);
+            else if (win.attachEvent) {
+                win.attachEvent('onmessage', onMessage);
             }
 
             if (this.element.nodeName !== 'IFRAME') {
                 const params = getOEmbedParameters(element, options);
                 const url = getVimeoUrl(params);
 
-                getOEmbedData(url, params).then((data) => {
+                getOEmbedData(url, params, element).then((data) => {
                     const iframe = createEmbed(data, element);
+                    // Overwrite element with the new iframe,
+                    // but store reference to the original element
                     this.element = iframe;
+                    this._originalElement = element;
 
                     swapCallbacks(element, iframe);
                     playerMap.set(this.element, this);
 
                     return data;
-                }).catch((error) => reject(error));
+                }).catch(reject);
             }
         });
 
@@ -140,7 +155,7 @@ class Player {
                 });
 
                 postMessage(this, name, args);
-            });
+            }).catch(reject);
         });
     }
 
@@ -164,7 +179,7 @@ class Player {
                 });
 
                 postMessage(this, name);
-            });
+            }).catch(reject);
         });
     }
 
@@ -176,23 +191,24 @@ class Player {
      * @return {Promise}
      */
     set(name, value) {
-        return Promise.resolve(value).then((val) => {
+        return new Promise((resolve, reject) => {
             name = getMethodName(name, 'set');
 
-            if (val === undefined || val === null) {
+            if (value === undefined || value === null) {
                 throw new TypeError('There must be a value to set.');
             }
 
+            // We are storing the resolve/reject handlers to call later, so we
+            // can’t return here.
+            // eslint-disable-next-line promise/always-return
             return this.ready().then(() => {
-                return new Promise((resolve, reject) => {
-                    storeCallback(this, name, {
-                        resolve,
-                        reject
-                    });
-
-                    postMessage(this, name, val);
+                storeCallback(this, name, {
+                    resolve,
+                    reject
                 });
-            });
+
+                postMessage(this, name, value);
+            }).catch(reject);
         });
     }
 
@@ -270,11 +286,11 @@ class Player {
      * the video is successfully loaded, or it will be rejected if it could
      * not be loaded.
      *
-     * @param {number} id The id of the video.
+     * @param {number|object} options The id of the video or an object with embed options.
      * @return {LoadVideoPromise}
      */
-    loadVideo(id) {
-        return this.callMethod('loadVideo', id);
+    loadVideo(options) {
+        return this.callMethod('loadVideo', options);
     }
 
     /**
@@ -292,7 +308,9 @@ class Player {
      * @return {ReadyPromise}
      */
     ready() {
-        const readyPromise = readyMap.get(this);
+        const readyPromise = readyMap.get(this) || new Promise((resolve, reject) => {
+            reject(new Error('Unknown player. Probably unloaded.'));
+        });
         return Promise.resolve(readyPromise);
     }
 
@@ -441,6 +459,29 @@ class Player {
     }
 
     /**
+     * Cleanup the player and remove it from the DOM
+     *
+     * It won't be usable and a new one should be constructed
+     *  in order to do any operations.
+     *
+     * @return {Promise}
+     */
+    destroy() {
+        return new Promise((resolve) => {
+            readyMap.delete(this);
+            playerMap.delete(this.element);
+            if (this._originalElement) {
+                playerMap.delete(this._originalElement);
+                this._originalElement.removeAttribute('data-vimeo-initialized');
+            }
+            if (this.element && this.element.nodeName === 'IFRAME' && this.element.parentNode) {
+                this.element.parentNode.removeChild(this.element);
+            }
+            resolve();
+        });
+    }
+
+    /**
      * A promise to get the autopause behavior of the video.
      *
      * @promise GetAutopausePromise
@@ -478,6 +519,21 @@ class Player {
      */
     setAutopause(autopause) {
         return this.set('autopause', autopause);
+    }
+
+    /**
+     * A promise to get the buffered property of the video.
+     *
+     * @promise GetBufferedPromise
+     * @fulfill {Array} Buffered Timeranges converted to an Array.
+     */
+    /**
+     * Get the buffered property of the video.
+     *
+     * @return {GetBufferedPromise}
+     */
+    getBuffered() {
+        return this.get('buffered');
     }
 
     /**
@@ -647,6 +703,39 @@ class Player {
         return this.set('loop', loop);
     }
 
+
+    /**
+     * A promise to set the muted state of the player.
+     *
+     * @promise SetMutedPromise
+     * @fulfill {boolean} The muted state that was set.
+     */
+    /**
+     * Set the muted state of the player. When set to `true`, the player
+     * volume will be muted.
+     *
+     * @param {boolean} muted
+     * @return {SetMutedPromise}
+     */
+    setMuted(muted) {
+        return this.set('muted', muted);
+    }
+
+    /**
+     * A promise to get the muted state of the player.
+     *
+     * @promise GetMutedPromise
+     * @fulfill {boolean} Whether or not the player is muted.
+     */
+    /**
+     * Get the muted state of the player.
+     *
+     * @return {GetMutedPromise}
+     */
+    getMuted() {
+        return this.get('muted');
+    }
+
     /**
      * A promise to get the paused state of the player.
      *
@@ -694,6 +783,51 @@ class Player {
      */
     setPlaybackRate(playbackRate) {
         return this.set('playbackRate', playbackRate);
+    }
+
+    /**
+     * A promise to get the played property of the video.
+     *
+     * @promise GetPlayedPromise
+     * @fulfill {Array} Played Timeranges converted to an Array.
+     */
+    /**
+     * Get the played property of the video.
+     *
+     * @return {GetPlayedPromise}
+     */
+    getPlayed() {
+        return this.get('played');
+    }
+
+    /**
+     * A promise to get the seekable property of the video.
+     *
+     * @promise GetSeekablePromise
+     * @fulfill {Array} Seekable Timeranges converted to an Array.
+     */
+    /**
+     * Get the seekable property of the video.
+     *
+     * @return {GetSeekablePromise}
+     */
+    getSeekable() {
+        return this.get('seekable');
+    }
+
+    /**
+     * A promise to get the seeking property of the player.
+     *
+     * @promise GetSeekingPromise
+     * @fulfill {boolean} Whether or not the player is currently seeking.
+     */
+    /**
+     * Get if the player is currently seeking.
+     *
+     * @return {GetSeekingPromise}
+     */
+    getSeeking() {
+        return this.get('seeking');
     }
 
     /**
@@ -845,7 +979,10 @@ class Player {
     }
 }
 
-initializeEmbeds();
-resizeEmbeds();
+// Setup embed only if this is not a node environment
+if (!isNode) {
+    initializeEmbeds();
+    resizeEmbeds();
+}
 
 export default Player;

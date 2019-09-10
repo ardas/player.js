@@ -11,6 +11,10 @@ test('parseMessageData parses strings', (t) => {
     t.deepEqual(parseMessageData('{ "method": "getColor" }'), { method: 'getColor' });
 });
 
+test('parseMessageData returns empty object with strings that can\'t be parsed', (t) => {
+    t.deepEqual(parseMessageData('post://{"name":"error","type":"postMessage"}'), {});
+});
+
 test('postMessage called correctly with just a method', (t) => {
     const postMessageSpy = sinon.spy();
     const player = {
@@ -156,7 +160,7 @@ test('processData rejects a method promise on an error event', async (t) => {
     });
 
     t.true(getCallbacks(player, 'getColor').length === 0);
-    await t.throws(methodPromise, (error) => {
-        return error.name === 'TypeError' && error.message === 'The color should be 3- or 6-digit hex value.';
-    });
+    const error = await t.throwsAsync(() => methodPromise);
+    t.is(error.name, 'TypeError');
+    t.is(error.message, 'The color should be 3- or 6-digit hex value.');
 });

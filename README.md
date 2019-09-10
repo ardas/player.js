@@ -1,4 +1,4 @@
-# Vimeo Player API [![Build Status](https://travis-ci.org/vimeo/player.js.svg?branch=master)](https://travis-ci.org/vimeo/player.js) [![Coverage](https://img.shields.io/codecov/c/github/vimeo/player.js.svg?maxAge=2592000)](https://codecov.io/gh/vimeo/player.js) [![npm](https://img.shields.io/npm/v/@vimeo/player.svg?maxAge=2592000)](https://www.npmjs.com/package/@vimeo/player) [![Gitter](https://badges.gitter.im/vimeo/player.js.svg)](https://gitter.im/vimeo/player.js)
+# Vimeo Player API [![Build Status](https://travis-ci.org/vimeo/player.js.svg?branch=master)](https://travis-ci.org/vimeo/player.js) [![Coverage](https://img.shields.io/codecov/c/github/vimeo/player.js.svg?maxAge=2592000)](https://codecov.io/gh/vimeo/player.js) [![npm](https://img.shields.io/npm/v/@vimeo/player.svg?maxAge=2592000)](https://www.npmjs.com/package/@vimeo/player)
 
 The Vimeo Player API allows you to interact with and control an embedded Vimeo
 Player.
@@ -11,17 +11,14 @@ You can install the Vimeo Player API through either npm:
 npm install @vimeo/player
 ```
 
-or Bower:
-
-```bash
-bower install vimeo-player-js
-```
-
 Alternatively, you can reference an up‐to‐date version on our CDN:
 
 ```html
 <script src="https://player.vimeo.com/api/player.js"></script>
 ```
+
+**Warning:** when used with RequireJS it's required to load the script dynamically via the RequireJS load system.
+http://www.requirejs.org/docs/api.html#jsfiles
 
 ## Getting Started
 
@@ -34,7 +31,7 @@ Already have a player on the page? Pass the element to the `Vimeo.Player`
 constructor and you’re ready to go.
 
 ```html
-<iframe src="https://player.vimeo.com/video/76979871" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+<iframe src="https://player.vimeo.com/video/76979871" width="640" height="360" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
 
 <script src="https://player.vimeo.com/api/player.js"></script>
 <script>
@@ -139,7 +136,7 @@ Similarly, if you’re using [RequireJS](http://www.requirejs.org) in the browse
 it will also import the Player constructor directly:
 
 ```html
-<iframe src="https://player.vimeo.com/video/76979871" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+<iframe src="https://player.vimeo.com/video/76979871" width="640" height="360" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
 
 <script>
     require(['https://player.vimeo.com/api/player.js'], function (Player) {
@@ -159,15 +156,17 @@ it will also import the Player constructor directly:
 * [Methods](#methods)
     + [on](#onevent-string-callback-function-void)
     + [off](#offevent-string-callback-function-void)
-    + [loadVideo](#loadvideoid-number-promisenumber-typeerrorpassworderrorerror)
+    + [loadVideo](#loadvideooptions-numberobject-promisenumberobject-typeerrorpassworderrorerror)
     + [ready](#ready-promisevoid-error)
     + [enableTextTrack](#enabletexttracklanguage-string-kind-string-promiseobject-invalidtracklanguageerrorinvalidtrackerrorerror)
     + [disableTextTrack](#disabletexttrack-promisevoid-error)
     + [pause](#pause-promisevoid-passworderrorprivacyerrorerror)
     + [play](#play-promisevoid-passworderrorprivacyerrorerror)
     + [unload](#unload-promisevoid-error)
+    + [destroy](#destroy-promisevoid-error)
     + [getAutopause](#getautopause-promiseboolean-unsupportederrorerror)
     + [setAutopause](#setautopauseautopause-boolean-promiseboolean-unsupportederrorerror)
+    + [getBuffered](#getbuffered-promisearray-error)
     + [getColor](#getcolor-promisestring-error)
     + [setColor](#setcolorcolor-string-promisestring-contrasterrortypeerrorerror)
     + [addCuePoint](#addcuepointtime-number-data-object-promisestring-unsupportederrorrangeerrorerror)
@@ -179,9 +178,14 @@ it will also import the Player constructor directly:
     + [getEnded](#getended-promiseboolean-error)
     + [getLoop](#getloop-promiseboolean-error)
     + [setLoop](#setlooploop-boolean-promiseboolean-error)
+    + [getMuted](#getmuted-promiseboolean-error)
+    + [setMuted](#setmuted-boolean-promiseboolean-error)
     + [getPaused](#getpaused-promiseboolean-error)
     + [getPlaybackRate](#getplaybackrate-promisenumber-error)
     + [setPlaybackRate](#setplaybackrateplaybackrate-number-promisenumber-rangeerrorerror)
+    + [getPlayed](#getplayed-promisearray-error)
+    + [getSeekable](#getseekable-promisearray-error)
+    + [getSeeking](#getseeking-promiseboolean-error)
     + [getTextTracks](#gettexttracks-promiseobject-error)
     + [getVideoEmbedCode](#getvideoembedcode-promisestring-error)
     + [getVideoId](#getvideoid-promisenumber-error)
@@ -191,17 +195,21 @@ it will also import the Player constructor directly:
     + [getVideoUrl](#getvideourl-promisestring-privacyerrorerror)
     + [getVolume](#getvolume-promisenumber-error)
     + [setVolume](#setvolumevolume-number-promisenumber-rangeerrorerror)
-- [Events](#events)
+* [Events](#events)
     + [play](#play)
     + [pause](#pause)
     + [ended](#ended)
     + [timeupdate](#timeupdate)
     + [progress](#progress)
+    + [seeking](#seeking)
     + [seeked](#seeked)
     + [texttrackchange](#texttrackchange)
     + [cuechange](#cuechange)
     + [cuepoint](#cuepoint)
     + [volumechange](#volumechange)
+    + [playbackratechange](#playbackratechange)
+    + [bufferstart](#bufferstart)
+    + [bufferend](#bufferend)
     + [error](#error)
     + [loaded](#loaded)
 * [Embed Options](#embed-options)
@@ -249,7 +257,7 @@ an embed inside that element. The options object should consist of either an
     };
 
     // Will create inside the made-in-ny div:
-    // <iframe src="https://player.vimeo.com/video/59777392?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+    // <iframe src="https://player.vimeo.com/video/59777392?loop=1" width="640" height="360" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     var madeInNy = new Vimeo.Player('made-in-ny', options);
 </script>
 ```
@@ -277,12 +285,12 @@ lightbox opened from clicking on a thumbnail, for example).
         loop: true
     };
 
-    // Will create inside the made-in-ny-div:
-    // <iframe src="https://player.vimeo.com/video/59777392?loop=1" width="640" height="360" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+    // Will create inside the made-in-ny div:
+    // <iframe src="https://player.vimeo.com/video/59777392?loop=1" width="640" height="360" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     var madeInNy = new Vimeo.Player('made-in-ny', options);
 
     // Will create inside the handstick div:
-    // <iframe src="https://player.vimeo.com/video/19231868?loop=1" width="500" height="281" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+    // <iframe src="https://player.vimeo.com/video/19231868?loop=1" width="500" height="281" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
     var handstick = new Vimeo.Player(document.getElementById('handstick'), options);
 </script>
 ```
@@ -361,7 +369,7 @@ player.off('play', onPlay);
 player.off('play');
 ```
 
-### loadVideo(id: number): Promise&lt;number, (TypeError|PasswordError|Error)&gt;
+### loadVideo(options: number|object): Promise&lt;number|object, (TypeError|PasswordError|Error)&gt;
 
 Load a new video into this embed. The promise will be resolved if the video is
 successfully loaded, or it will be rejected if it could not be loaded.
@@ -499,11 +507,25 @@ player.play().then(function() {
 
 ### unload(): Promise&lt;void, Error&gt;
 
-Return the player to its initial state.
+Return the internal player (iframe) to its initial state.
 
 ```js
 player.unload().then(function() {
     // the video was unloaded
+}).catch(function(error) {
+    // an error occurred
+});
+```
+### destroy(): Promise&lt;void, Error&gt;
+
+Cleanup the player and remove it from the DOM.
+
+It won't be usable and a new one should be constructed
+ in order to do any operations.
+
+```js
+player.destroy().then(function() {
+    // the player was destroyed
 }).catch(function(error) {
     // an error occurred
 });
@@ -549,6 +571,18 @@ player.setAutopause(false).then(function(autopause) {
             // some other error occurred
             break;
     }
+});
+```
+
+### getBuffered(): Promise&lt;array, Error&gt;
+
+Get the buffered time ranges of the video.
+
+```js
+player.getBuffered().then(function(buffered) {
+    // buffered = an array of the buffered video time ranges.
+}).catch(function(error) {
+    // an error occurred
 });
 ```
 
@@ -772,6 +806,30 @@ player.setLoop(true).then(function(loop) {
 });
 ```
 
+### getMuted(): Promise&lt;boolean, Error&gt;
+
+Get the muted state of the player.
+
+```js
+player.getMuted().then(function(muted) {
+    // muted = whether muted is turned on or not
+}).catch(function(error) {
+    // an error occurred
+});
+```
+
+### setMuted(muted: boolean): Promise&lt;boolean, Error&gt;
+
+Set the muted state of the player. When set to `true`, the player volume will be muted.
+
+```js
+player.setMuted(true).then(function(muted) {
+    // muted was turned on
+}).catch(function(error) {
+    // an error occurred
+});
+```
+
 ### getPaused(): Promise&lt;boolean, Error&gt;
 
 Get the paused state of the player.
@@ -798,7 +856,7 @@ player.getPlaybackRate().then(function(playbackRate) {
 
 ### setPlaybackRate(playbackRate: number): Promise&lt;number, (RangeError|Error)&gt;
 
-Set the playback rate of the player on a scale from `0.5` to `2`. When set
+Set the playback rate of the player on a scale from `0.5` to `2` (available to PRO and Business accounts). When set
 via the API, the playback rate will not be synchronized to other
 players or stored as the viewer's preference.
 
@@ -815,6 +873,42 @@ player.setPlaybackRate(0.5).then(function(playbackRate) {
             // some other error occurred
             break;
     }
+});
+```
+
+### getPlayed(): Promise&lt;array, Error&gt;
+
+Get the played time ranges of the video.
+
+```js
+player.getPlayed().then(function(played) {
+    // played = array values of the played video time ranges.
+}).catch(function(error) {
+    // an error occurred
+});
+```
+
+### getSeekable(): Promise&lt;array, Error&gt;
+
+Get the video time ranges that are seekable.
+
+```js
+player.getSeekable().then(function(seekable) {
+    // seekable = array values of the seekable video time ranges.
+}).catch(function(error) {
+    // an error occurred
+});
+```
+
+### getSeeking(): Promise&lt;boolean, Error&gt;
+
+Get if the player is currently seeking.
+
+```js
+player.getSeeking().then(function(seeking) {
+    // seeking = whether the player is seeking or not
+}).catch(function(error) {
+    // an error occurred
 });
 ```
 
@@ -1063,6 +1157,19 @@ been buffered.
 }
 ```
 
+### seeking
+
+Triggered when the player starts seeking to a specific time. A `timeupdate` event will
+also be fired at the same time.
+
+```js
+{
+    duration: 61.857
+    percent: 0.485
+    seconds: 30
+}
+```
+
 ### seeked
 
 Triggered when the player seeks to a specific time. A `timeupdate` event will
@@ -1141,6 +1248,27 @@ event will never fire on those devices.
 }
 ```
 
+### playbackratechange
+
+Triggered when the playback rate of the video in the player changes. The ability to change rate can be disabled by the creator
+and the event will not fire for those videos. The new playback rate is returned with the event.
+
+```js
+{
+    playbackRate: 1.5
+}
+```
+
+### bufferstart
+
+Triggered when buffering starts in the player. This is also triggered during preload and while seeking. There is no associated data with this event.
+
+
+### bufferend
+
+Triggered when buffering ends in the player. This is also triggered at the end of preload and seeking. There is no associated data with this event.
+
+
 ### error
 
 Triggered when some kind of error is generated in the player. In general if you
@@ -1171,20 +1299,30 @@ Triggered when a new video is loaded in the player.
 ## Embed Options
 
 These options are available to use as `data-vimeo-` attributes on elements or as
-an object passed to the `Vimeo.Player` constructor.
+an object passed to the `Vimeo.Player` constructor. More information on embed options can be found in the [Vimeo Help Center](https://help.vimeo.com/hc/en-us/articles/360001494447-Using-Player-Parameters).
 
 option      | default  | description
 ----------- | -------- | -----------
 id _or_ url |          | **Required.** Either the id or the url of the video.
 autopause   | `true`   | Pause this video automatically when another one plays.
 autoplay    | `false`  | Automatically start playback of the video. Note that this won’t work on some devices.
+background  | `false`  | Enable the player's background mode which hides the controls, autoplays and loops the video (available to  Plus, PRO, or Business members).
 byline      | `true`   | Show the byline on the video.
 color       | `00adef` | Specify the color of the video controls. Colors may be overridden by the embed settings of the video.
+controls    | `true`   | This parameter will hide all elements in the player (play bar, sharing buttons, etc) for a chromeless experience. ⚠️Warning: When using this parameter, the play bar and UI will be hidden. To start playback for your viewers, you'll need to either enable autoplay or use our player SDK to start and control playback. (available to Plus, PRO, or Business members)
+dnt         | `false`  | Block the player from tracking any session data, including cookies.
 height      |          | The exact height of the video. Defaults to the height of the largest available version of the video.
 loop        | `false`  | Play the video again when it reaches the end.
+responsive  | `false`  | Resize according their parent element (experimental)
 maxheight   |          | Same as height, but video will not exceed the native size of the video.
 maxwidth    |          | Same as width, but video will not exceed the native size of the video.
+muted       | `false`  | Mute this video on load. Required to autoplay in certain browsers.
+playsinline | `true`   | Play video inline on mobile devices, to automatically go fullscreen on playback set this parameter to `false`.
 portrait    | `true`   | Show the portrait on the video.
-speed       | `false`  | Show the speed controls in the preferences menu and enable playback rate API.
+quality     |          | Vimeo Plus, PRO, and Business members can default an embedded video to a specific quality on desktop. Possible values: `4K`, `2K`, `1080p`, `720p`, `540p`, `360p` and `240p` https://help.vimeo.com/hc/en-us/articles/224983008-Setting-default-quality-for-embedded-videos
+speed       | `false`  | Show the speed controls in the preferences menu and enable playback rate API (available to PRO and Business accounts).
+texttrack   |          | Turn captions/subtitles on for a specific language by default. If you enter a language preference that hasn't yet been uploaded for your particular video, the text track parameter will be ignored, and your embedded video may load with CC or subtitles disabled by default. Supports lowercase language code (such as: `fr`, `es`, `de`, `en`). You can find a full list of popular language codes [here](https://www.andiamo.co.uk/resources/iso-language-codes/).
 title       | `true`   | Show the title on the video.
+transparent | `true`   | The responsive player and transparent background are enabled by default, to disable set this parameter to `false`.
 width       |          | The exact width of the video. Defaults to the width of the largest available version of the video.
+
